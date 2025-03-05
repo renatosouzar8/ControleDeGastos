@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Gastos</title>
+
+  <!-- Supabase e Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Ícones para os botões (editar, remover) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { color: #333; }
+    form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background-color: #28a745;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #218838; }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    th { background-color: #f8f9fa; }
+    .total {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+    }
+    .icon-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      margin-right: 10px;
+    }
+    .icon-button i {
+      color: #333;
+    }
+    .icon-button i:hover { color: #007bff; }
+    .filters { margin-top: 20px; }
+    .chart-container {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 400px;
+      float: left;
+    }
+    .category-list {
+      margin-top: 20px;
+      float: left;
+      margin-left: 20px;
+      width: calc(100% - 440px);
+    }
+    .category-item {
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .clear-float { clear: both; }
+  </style>
+</head>
+<body>
+  <h1>Controle de Gastos</h1>
+
+  <!-- Formulários de Cadastro e Login -->
+  <div id="auth">
+    <form id="signupForm">
+      <h2>Cadastro</h2>
+      <input type="email" id="signupEmail" placeholder="E-mail" required>
+      <input type="password" id="signupPassword" placeholder="Senha" required>
+      <button type="submit">Cadastrar</button>
+    </form>
+
+    <form id="loginForm">
+      <h2>Login</h2>
+      <input type="email" id="loginEmail" placeholder="E-mail" required>
+      <input type="password" id="loginPassword" placeholder="Senha" required>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+
+  <!-- Dashboard: só visível se estiver logado -->
+  <div id="dashboard" style="display: none;">
+
+    <!-- Botão de Logout -->
+    <button id="logoutBtn" style="float: right; margin-bottom: 10px;">Logout</button>
+
+    <!-- Formulário de Despesa -->
+    <form id="expenseForm">
+      <label for="description">Descrição:</label>
+      <input type="text" id="description" placeholder="Ex: Mercado" required>
+
+      <label for="date">Data:</label>
+      <input type="date" id="date" required>
+
+      <label for="amount">Valor (R$):</label>
+      <input type="number" id="amount" step="0.01" placeholder="Ex: 50.00" required>
+
+      <button type="submit">Adicionar Despesa</button>
+    </form>
+
+    <!-- Filtros -->
+    <div class="filters">
+      <label for="filterYear">Ano:</label>
+      <select id="filterYear"></select>
+
+      <label for="filterMonths">Mês(es):</label>
+      <select id="filterMonths" multiple>
+        <option value="01">Janeiro</option>
+        <option value="02">Fevereiro</option>
+        <option value="03">Março</option>
+        <option value="04">Abril</option>
+        <option value="05">Maio</option>
+        <option value="06">Junho</option>
+        <option value="07">Julho</option>
+        <option value="08">Agosto</option>
+        <option value="09">Setembro</option>
+        <option value="10">Outubro</option>
+        <option value="11">Novembro</option>
+        <option value="12">Dezembro</option>
+      </select>
+
+      <label for="filterCategory">Filtrar por Categoria:</label>
+      <select id="filterCategory">
+        <option value="">Todas as Categorias</option>
+        <option value="Alimentação">Alimentação</option>
+        <option value="Transporte">Transporte</option>
+        <option value="Lazer">Lazer</option>
+        <option value="Educação">Educação</option>
+        <option value="Moradia">Moradia</option>
+        <option value="Outros">Outros</option>
+      </select>
+
+      <button id="applyFilters" type="button">Aplicar Filtros</button>
+      <button id="clearFilters" type="button">Limpar Filtros</button>
+    </div>
+
+    <!-- Tabela de Despesas -->
+    <table id="expensesTable">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Descrição</th>
+          <th>Categoria</th>
+          <th>Valor (R$)</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="total" id="totalAmount">Total: R$ 0.00</div>
+
+    <!-- Gráfico e Lista de Categorias -->
+    <div class="chart-container">
+      <canvas id="expensesChart"></canvas>
+    </div>
+    <div class="category-list" id="categoryList"></div>
+    <div class="clear-float"></div>
+  </div>
+
+  <script>
+    /********************************************************************
+     * 1. CONFIGURAÇÃO DO SUPABASE
+     ********************************************************************/
+    // Substitua pelos dados do seu projeto Supabase
+    const SUPABASE_URL = "https://ujvkoomqxbfibssamobi.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqdmtvb21xeGJmaWJzc2Ftb2JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExNDc1MjcsImV4cCI6MjA1NjcyMzUyN30.lw96UIw5cSkJIE70oxj-L2EU07aQELOx90-yLwcrENs";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log("Supabase client criado:", supabaseClient);
+
+    /********************************************************************
+     * 2. AUTENTICAÇÃO (CADASTRO E LOGIN)
+     ********************************************************************/
+    document.getElementById("signupForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      console.log("Botão de cadastro clicado");
+      const email = document.getElementById("signupEmail").value;
+      const password = document.getElementById("signupPassword").value;
+      console.log("Dados do cadastro:", email, password);
+
+      try {
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) {
+          console.error("Erro no cadastro:", error);
+          alert("Erro no cadastro: " + error.message);
+        } else {
+          alert("Cadastro realizado com sucesso! Verifique seu e-mail para confirmar.");
+          console.log("Usuário cadastrado:", data);
+        }
+      } catch (err) {
+        console.error("Exceção no cadastro:", err);
+        alert("Exceção no cadastro: " + err.message);
+      }
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      console.log("Botão de login clicado");
+      const email = document.getElementById("loginEmail").value;
+      const password = document.getElementById("loginPassword").value;
+      console.log("Dados do login:", email, password);
+
+      try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+          console.error("Erro no login:", error);
+          alert("Erro no login: " + error.message);
+        } else {
+          alert("Login realizado com sucesso!");
+          localStorage.setItem("session", JSON.stringify(data.session));
+          console.log("Usuário logado:", data);
+          // Atualiza a interface sem recarregar a página
+          checkLogin();
+          loadExpenses();
+        }
+      } catch (err) {
+        console.error("Exceção no login:", err);
+        alert("Exceção no login: " + err.message);
+      }
+    });
+
+    // Verifica se há sessão ativa e mostra/oculta o dashboard
+    function checkLogin() {
+      const session = JSON.parse(localStorage.getItem("session"));
+      if (session) {
+        document.getElementById("auth").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+      } else {
+        document.getElementById("auth").style.display = "block";
+        document.getElementById("dashboard").style.display = "none";
+      }
+    }
+    checkLogin();
+
+    /********************************************************************
+     * 3. VARIÁVEIS E FUNÇÕES GERAIS
+     ********************************************************************/
+    let expenses = [];          // Lista de despesas carregadas do Supabase
+    let filteredExpenses = [];  // Lista de despesas após aplicação de filtros
+    let chartInstance = null;   // Referência ao gráfico para recriar
+
+    // Capitaliza a primeira letra da descrição
+    function capitalizeFirstWord(text) {
+      return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+    }
+
+    // Auto-categorização básica
+    function autoCategorize(description) {
+      const descLower = description.toLowerCase();
+      if (descLower.includes("mercado") || descLower.includes("comida")) {
+        return "Alimentação";
+      } else if (descLower.includes("ônibus") || descLower.includes("táxi") || descLower.includes("transporte")) {
+        return "Transporte";
+      } else if (descLower.includes("cinema") || descLower.includes("viagem") || descLower.includes("lazer") || descLower.includes("futebol")) {
+        return "Lazer";
+      } else if (descLower.includes("escola") || descLower.includes("crianças") || descLower.includes("educação")) {
+        return "Educação";
+      } else if (descLower.includes("aluguel") || descLower.includes("moradia") || descLower.includes("internet") ||
+                 descLower.includes("água") || descLower.includes("luz") || descLower.includes("condomínio")) {
+        return "Moradia";
+      } else {
+        return "Outros";
+      }
+    }
+
+    // Formatação de datas
+    function formatDateForDisplay(date) {
+      // Recebe "yyyy-mm-dd" e retorna "dd/mm/yyyy"
+      const [year, month, day] = date.split("-");
+      return `${day}/${month}/${year}`;
+    }
+    function formatDateForInput(date) {
+      // Recebe "dd/mm/yyyy" e retorna "yyyy-mm-dd"
+      const [day, month, year] = date.split("/");
+      return `${year}-${month}-${day}`;
+    }
+
+    // Carrega despesas do Supabase para a variável "expenses"
+    async function loadExpenses() {
+      const session = JSON.parse(localStorage.getItem("session"));
+      if (!session) return;
+
+      try {
+        const { data, error } = await supabaseClient
+          .from("expenses")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("date", { ascending: false });
+
+        if (error) {
+          console.error("Erro ao buscar despesas no Supabase:", error);
+          return;
+        }
+
+        expenses = data || [];
+        filteredExpenses = [...expenses];
+        renderFilteredExpenses();
+      } catch (err) {
+        console.error("Erro inesperado ao carregar despesas:", err);
+      }
+    }
+
+    // Renderiza as despesas filtradas na tabela e atualiza o gráfico
+    function renderFilteredExpenses() {
+      const expensesTableBody = document.querySelector("#expensesTable tbody");
+      const totalAmountDisplay = document.getElementById("totalAmount");
+      expensesTableBody.innerHTML = "";
+      let total = 0;
+      filteredExpenses.forEach(exp => {
+        total += exp.amount;
+        addExpenseToTable(exp);
+      });
+      totalAmountDisplay.textContent = `Total: R$ ${total.toFixed(2)}`;
+      updateChartAndCategories();
+    }
+
+    // Adiciona uma linha na tabela HTML com os dados de uma despesa
+    function addExpenseToTable(expense) {
+      const expensesTableBody = document.querySelector("#expensesTable tbody");
+      const row = document.createElement("tr");
+
+      const dateCell = document.createElement("td");
+      dateCell.textContent = formatDateForDisplay(expense.date);
+      row.appendChild(dateCell);
+
+      const descriptionCell = document.createElement("td");
+      descriptionCell.textContent = expense.description;
+      row.appendChild(descriptionCell);
+
+      const categoryCell = document.createElement("td");
+      categoryCell.textContent = expense.category;
+      row.appendChild(categoryCell);
+
+      const amountCell = document.createElement("td");
+      amountCell.textContent = expense.amount.toFixed(2);
+      row.appendChild(amountCell);
+
+      const actionsCell = document.createElement("td");
+      const editButton = document.createElement("button");
+      editButton.className = "icon-button";
+      const editIcon = document.createElement("i");
+      editIcon.className = "fas fa-pencil-alt";
+      editButton.appendChild(editIcon);
+      editButton.addEventListener("click", () => editExpense(expense));
+      actionsCell.appendChild(editButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "icon-button";
+      const deleteIcon = document.createElement("i");
+      deleteIcon.className = "fas fa-trash-alt";
+      deleteButton.appendChild(deleteIcon);
+      deleteButton.addEventListener("click", () => removeExpense(expense.id));
+      actionsCell.appendChild(deleteButton);
+
+      row.appendChild(actionsCell);
+      expensesTableBody.appendChild(row);
+    }
+
+    // Atualiza o gráfico e a lista de categorias com base nas despesas filtradas
+    function updateChartAndCategories() {
+      const categoryList = document.getElementById("categoryList");
+      const chartCanvas = document.getElementById("expensesChart");
+      const categories = {};
+      filteredExpenses.forEach(expense => {
+        categories[expense.category] = (categories[expense.category] || 0) + expense.amount;
+      });
+      const labels = Object.keys(categories);
+      const data = Object.values(categories);
+      const totalFilteredAmount = data.reduce((sum, val) => sum + val, 0);
+      const percentages = labels.map((label, idx) => ((data[idx] / totalFilteredAmount) * 100).toFixed(2));
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(chartCanvas, {
+        type: "pie",
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "top" },
+            title: { display: true, text: "Gastos por Categoria" }
+          }
+        }
+      });
+
+      categoryList.innerHTML = "";
+      labels.forEach((label, idx) => {
+        const categoryItem = document.createElement("div");
+        categoryItem.className = "category-item";
+        categoryItem.textContent = `${label}: ${percentages[idx]}%`;
+        categoryList.appendChild(categoryItem);
+      });
+    }
+
+    /********************************************************************
+     * 4. CRIAR, EDITAR, REMOVER DESPESAS NO SUPABASE
+     ********************************************************************/
+    // Adicionar despesa
+    document.getElementById("expenseForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const session = JSON.parse(localStorage.getItem("session"));
+      if (!session) {
+        alert("Você precisa estar logado para adicionar despesas!");
+        return;
+      }
+
+      const date = document.getElementById("date").value;
+      const description = capitalizeFirstWord(document.getElementById("description").value.trim());
+      const amount = parseFloat(document.getElementById("amount").value.trim());
+      const category = autoCategorize(description);
+
+      if (!description || isNaN(amount) || amount <= 0) {
+        alert("Por favor, preencha todos os campos corretamente.");
+        return;
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from("expenses")
+          .insert([{ user_id: session.user.id, date, description, category, amount }])
+          .select("*");
+
+        if (error) {
+          console.error("Erro ao inserir despesa no Supabase:", error);
+          alert("Erro ao inserir despesa no banco.");
+        } else {
+          alert("Despesa adicionada com sucesso!");
+          loadExpenses();
+          document.getElementById("expenseForm").reset();
+        }
+      } catch (err) {
+        console.error("Erro inesperado:", err);
+        alert("Ocorreu um erro ao adicionar despesa.");
+      }
+    });
+
+    // Remover despesa
+    async function removeExpense(expenseId) {
+      if (!confirm("Deseja realmente remover esta despesa?")) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from("expenses")
+          .delete()
+          .eq("id", expenseId);
+
+        if (error) {
+          console.error("Erro ao remover despesa:", error);
+          alert("Não foi possível remover a despesa.");
+        } else {
+          alert("Despesa removida com sucesso!");
+          loadExpenses();
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao remover despesa:", err);
+      }
+    }
+
+    // Editar despesa
+    async function editExpense(expense) {
+      const oldDate = formatDateForDisplay(expense.date);
+      const newDescription = prompt("Editar descrição:", expense.description);
+      if (!newDescription) return;
+
+      const newDateDisplay = prompt("Editar data (dd/mm/yyyy):", oldDate);
+      if (!newDateDisplay) return;
+      const newDate = formatDateForInput(newDateDisplay);
+
+      const newAmountStr = prompt("Editar valor:", expense.amount);
+      if (!newAmountStr) return;
+      const newAmount = parseFloat(newAmountStr);
+
+      const categories = ["Alimentação", "Transporte", "Lazer", "Educação", "Moradia", "Outros"];
+      const categoryOptions = categories.join("\n");
+      const newCategory = prompt(`Editar categoria:\n${categoryOptions}`, expense.category);
+      if (!newCategory) return;
+
+      if (isNaN(newAmount) || newAmount <= 0 || !categories.includes(newCategory)) {
+        alert("Edição cancelada ou dados inválidos.");
+        return;
+      }
+
+      const capitalizedDescription = capitalizeFirstWord(newDescription);
+      try {
+        const { data, error } = await supabaseClient
+          .from("expenses")
+          .update({
+            date: newDate,
+            description: capitalizedDescription,
+            category: newCategory,
+            amount: newAmount
+          })
+          .eq("id", expense.id);
+
+        if (error) {
+          console.error("Erro ao editar despesa:", error);
+          alert("Não foi possível editar a despesa.");
+        } else {
+          alert("Despesa editada com sucesso!");
+          loadExpenses();
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao editar despesa:", err);
+      }
+    }
+
+    /********************************************************************
+     * 5. FILTROS
+     ********************************************************************/
+    document.getElementById("applyFilters").addEventListener("click", () => {
+      const filterYear = document.getElementById("filterYear").value;
+      const filterMonths = Array.from(document.getElementById("filterMonths").selectedOptions).map(o => o.value);
+      const filterCategory = document.getElementById("filterCategory").value;
+
+      filteredExpenses = expenses.filter(exp => {
+        const [year, month] = exp.date.split("-");
+        const matchesYear = !filterYear || year === filterYear;
+        const matchesMonth = filterMonths.length === 0 || filterMonths.includes(month);
+        const matchesCategory = !filterCategory || exp.category === filterCategory;
+        return matchesYear && matchesMonth && matchesCategory;
+      });
+      renderFilteredExpenses();
+    });
+
+    document.getElementById("clearFilters").addEventListener("click", () => {
+      document.getElementById("filterYear").value = "";
+      document.getElementById("filterMonths").selectedIndex = -1;
+      document.getElementById("filterCategory").value = "";
+      filteredExpenses = [...expenses];
+      renderFilteredExpenses();
+    });
+
+    /********************************************************************
+     * 6. EVENTO DE LOGOUT
+     ********************************************************************/
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      try {
+        // Remove a sessão do localStorage
+        localStorage.removeItem("session");
+        // Opcional: deslogar também no Supabase
+        await supabaseClient.auth.signOut();
+      } catch (err) {
+        console.error("Erro ao deslogar do Supabase:", err);
+      }
+      // Recarrega a página para exibir login/cadastro novamente
+      window.location.reload();
+    });
+
+    /********************************************************************
+     * 7. INICIALIZAÇÃO (CARREGAR ANOS E DESPESAS)
+     ********************************************************************/
+    document.addEventListener("DOMContentLoaded", () => {
+      // Preenche o select de anos (do ano atual até 10 anos atrás)
+      const filterYearSelect = document.getElementById("filterYear");
+      const currentYear = new Date().getFullYear();
+      for (let year = currentYear; year >= currentYear - 10; year--) {
+        const option = document.createElement("option");
+        option.value = year;
+        option.textContent = year;
+        filterYearSelect.appendChild(option);
+      }
+
+      // Se o usuário estiver logado, carrega as despesas do Supabase
+      const session = JSON.parse(localStorage.getItem("session"));
+      if (session) {
+        loadExpenses();
+      }
+    });
+  </script>
+</body>
+</html>
