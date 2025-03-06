@@ -136,7 +136,7 @@
       <input type="date" id="date" required>
 
       <label for="amount">Valor (R$):</label>
-      <input type="number" id="amount" step="0.01" placeholder="Ex: 50.00" required>
+      <input type="number" id="amount" step="0.01" placeholder="Ex: 50,00" required>
 
       <button type="submit">Adicionar Despesa</button>
     </form>
@@ -191,7 +191,7 @@
       <tbody></tbody>
     </table>
 
-    <div class="total" id="totalAmount">Total: R$ 0.00</div>
+    <div class="total" id="totalAmount">Total: R$ 0,00</div>
 
     <!-- Gráfico e Lista de Categorias -->
     <div class="chart-container">
@@ -353,7 +353,8 @@
         total += exp.amount;
         addExpenseToTable(exp);
       });
-      totalAmountDisplay.textContent = `Total: R$ ${total.toFixed(2)}`;
+      // Formata o total trocando ponto por vírgula
+      totalAmountDisplay.textContent = `Total: R$ ${total.toFixed(2).replace(".", ",")}`;
       updateChartAndCategories();
     }
 
@@ -375,7 +376,8 @@
       row.appendChild(categoryCell);
 
       const amountCell = document.createElement("td");
-      amountCell.textContent = expense.amount.toFixed(2);
+      // Formata o valor com duas casas decimais e troca o separador
+      amountCell.textContent = expense.amount.toFixed(2).replace(".", ",");
       row.appendChild(amountCell);
 
       const actionsCell = document.createElement("td");
@@ -410,7 +412,8 @@
       const labels = Object.keys(categories);
       const data = Object.values(categories);
       const totalFilteredAmount = data.reduce((sum, val) => sum + val, 0);
-      const percentages = labels.map((label, idx) => ((data[idx] / totalFilteredAmount) * 100).toFixed(2));
+      // Formata os percentuais com vírgula
+      const percentages = labels.map((label, idx) => ((data[idx] / totalFilteredAmount) * 100).toFixed(2).replace(".", ","));
 
       if (chartInstance) chartInstance.destroy();
       chartInstance = new Chart(chartCanvas, {
